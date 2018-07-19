@@ -133,7 +133,6 @@ void firewall_start(bool startup)
                       // custom filter chains
                       "-t filter -N connlimit",
                       "-t filter -N custom-forward",
-                      "-t filter -N custom-inbound",
                       "-t filter -N custom-input",
                       "-t filter -N custom-output",
                       "-t filter -N dnsmasq-service",
@@ -155,7 +154,6 @@ void firewall_start(bool startup)
                       "-t filter -A INPUT -m conntrack --ctstate NEW -j hotspot",
                       "-t filter -A INPUT -m conntrack --ctstate NEW -j vpn-inbound",
                       "-t filter -A INPUT -m conntrack --ctstate NEW -j vpn-routing",
-                      "-t filter -A INPUT -m conntrack --ctstate NEW -j custom-inbound",
                       "-t filter -A INPUT -m conntrack --ctstate NEW -j custom-input",
                       "-t filter -A INPUT -i lo -j ACCEPT",
                       "-t filter -A INPUT -j DROP",
@@ -174,9 +172,6 @@ void firewall_start(bool startup)
                       "-t filter -A services-inbound -j webadmin-service",
                       "-t filter -A services-inbound -j dnsmasq-service",
                       "-t filter -A services-inbound -j icmp-service",
-                      "-t filter -A custom-inbound -i lo -j ACCEPT",    
-                      "-t filter -A custom-inbound -i br0 -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT",
-                      "-t filter -A custom-inbound -j DROP",
                       NULL
                     };
 
@@ -316,7 +311,7 @@ void portforward_start()
 
 void miniupnpd_start()
 {
-    sysexec(true, "iptables", "-t filter -D custom-inbound -i br+ -j ACCEPT");
+    sysexec(true, "iptables", "-t filter -D services-inbound -i br+ -j ACCEPT");
     sysexec(true, "iptables", "-t filter -F MINIUPNPD-FORWARD");
     sysexec(true, "iptables", "-t nat -F MINIUPNPD-PREROUTING");
     sysexec(true, "iptables", "-t filter -F MINIUPNPD");
@@ -332,7 +327,7 @@ void miniupnpd_start()
         char *secondaryaddr = config_read_string("network.secondary_wireless.ipaddr");
         char *thirdaddr = config_read_string("network.third_wireless.ipaddr");
 
-        sysexec(true, "iptables", "-t filter -I custom-inbound -i br+ -j ACCEPT");
+        sysexec(true, "iptables", "-t filter -I services-inbound -i br+ -j ACCEPT");
         sysexec(true, "iptables", "-t filter -I MINIUPNPD-FORWARD -i %s -j MINIUPNPD", wan);
         sysexec(true, "iptables", "-t nat -I MINIUPNPD-PREROUTING -i %s -j MINIUPNPD", wan);
 
@@ -1643,15 +1638,15 @@ void dropbear_start()
         network = config_read_string("remoteshell.network");
 
         if(IS(network, "lan"))
-            sysexec(true, "iptables", "-t filter -A custom-inbound -i br+ -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
+            sysexec(true, "iptables", "-t filter -A services-inbound -i br+ -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
         else
         if(IS(network, "wan"))
-            sysexec(true, "iptables", "-t filter -A custom-inbound -i eth1 -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
+            sysexec(true, "iptables", "-t filter -A services-inbound -i eth1 -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
         else
         if(IS(network, "lan+wan"))
-            sysexec(true, "iptables", "-t filter -A custom-inbound -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
+            sysexec(true, "iptables", "-t filter -A services-inbound -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
 
-        sysexec(true, "dropbear", "-g -w -m -j -k -p 0.0.0.0:22");
+        sysexec(true, "dropbear", "-p 0.0.0.0:22");
     }
 }
 

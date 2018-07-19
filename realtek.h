@@ -104,7 +104,6 @@ struct hw_header
 
 bool read_hw_settings(struct hw_header *hw);
 bool hwflash_read(struct hw_header *hw, int len);
-bool hwflash_write(struct hw_header *hw, int len);
 
 bool upgrade_fwimage(unsigned char *data);
 

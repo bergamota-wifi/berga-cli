@@ -842,7 +842,7 @@ void config_adapt()
             { cJSON_String, &sub1, NULL, "domain", "" },
 
         { cJSON_Object, &json_root, &sub1, "remoteshell", NULL },
-            { cJSON_String, &sub1, NULL, "active", "false" },
+            { cJSON_String, &sub1, NULL, "active", "true" },
             { cJSON_String, &sub1, NULL, "username", "" },
             { cJSON_String, &sub1, NULL, "password", "" },
             { cJSON_String, &sub1, NULL, "key_rsa", "" },
