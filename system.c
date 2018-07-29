@@ -1347,10 +1347,11 @@ void wireless_start(bool startup)
         if(IS(opmode, "repeater"))
             sysexec(true, "ip", "link set %s up", "wlan0-vxd");
 
-        procwrite("/proc/wlan0/led", "21\n");
+
+        procwrite("/proc/wlan0/led", "3");
     }
     else
-        procwrite("/proc/wlan0/led", "0\n");
+        procwrite("/proc/wlan0/led", "0");
 }
 
 void syslog_start()
@@ -1793,6 +1794,9 @@ void qos_start()
 //! executed by inittab
 void sysinit_main(int argc, char **argv)
 {
+    // system led
+    procwrite("/proc/gpio", "2");
+
     // set approximate date
     sysexec(false, "date", "-s 2018-01-01");
 
