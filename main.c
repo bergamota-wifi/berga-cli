@@ -74,7 +74,7 @@ int main(int argc, char **argv)
                 udhcpc_lease_command(argv[1]);
                 return EXIT_SUCCESS;
             }
-
+            //////////////////////////////////////////
             if(argc>=2)
             {
                 if(IS(fname, "berga-cli"))

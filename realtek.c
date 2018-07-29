@@ -135,28 +135,6 @@ bool hwflash_read(struct hw_header *hw, int len)
     return ok;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-bool hwflash_write(struct hw_header *hw, int len)
-{
-    FILE *f;
-    int ok = true;
-
-    f = fopen(HWINFO_DEVICE_NAME, "wb");
-
-    if(!f)
-        return false;
-
-    if(fwrite(hw, 1, len, f) != len)
-    {
-        DEBUG("Wrong write length, alignment issue?");
-        ok = false;
-    }
-
-    fclose(f);
-
-    return ok;
-}
-
 bool upgrade_fwimage(unsigned char *data)
 {
     struct img_header header;
