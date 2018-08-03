@@ -988,7 +988,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.primary_wireless.hidden"))
                 fprintf(cfg, "wlan0_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0_hiddenAP=0\n");
@@ -1073,7 +1073,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0-va1_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.secondary_wireless.hidden"))
                 fprintf(cfg, "wlan0-va1_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0-va1_hiddenAP=0\n");
@@ -1154,7 +1154,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0-va2_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.third_wireless.hidden"))
                 fprintf(cfg, "wlan0-va2_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0-va2_hiddenAP=0\n");
