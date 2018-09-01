@@ -676,6 +676,7 @@ void config_adapt()
             { cJSON_String, &sub1, NULL, "password", "d033e22ae348aeb5660fc2140aec35850c4da997" },
             { cJSON_String, &sub1, NULL, "timezone", "BRT3" },
             { cJSON_String, &sub1, NULL, "timezonedst", "false" },
+            { cJSON_String, &sub1, NULL, "httpd_port", "80" },
 
             { cJSON_Object, &sub1, &sub2, "timeservers", NULL },
                 { cJSON_String, &sub2, NULL, "server1", "0.pool.ntp.org" },

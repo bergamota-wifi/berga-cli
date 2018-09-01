@@ -999,7 +999,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.primary_wireless.hidden"))
                 fprintf(cfg, "wlan0_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0_hiddenAP=0\n");
@@ -1084,7 +1084,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0-va1_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.secondary_wireless.hidden"))
                 fprintf(cfg, "wlan0-va1_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0-va1_hiddenAP=0\n");
@@ -1165,7 +1165,7 @@ void wireless_start(bool startup)
             else
                 fprintf(cfg, "wlan0-va2_sta_asoc_rssi_th=0\n");
 
-            if(config_item_active("network.wireless.hidden"))
+            if(config_item_active("network.third_wireless.hidden"))
                 fprintf(cfg, "wlan0-va2_hiddenAP=1\n");
             else
                 fprintf(cfg, "wlan0-va2_hiddenAP=0\n");
@@ -1662,6 +1662,26 @@ void dropbear_start()
     }
 }
 
+void webserver_start(bool startup)
+{
+    char *webport = config_read_string("system.httpd_port");
+
+    sysexec(true, "iptables", "-F webadmin-service");
+    if(config_item_active("firewall.basic.wanddos"))
+        sysexec(true, "iptables", "-t filter -A webadmin-service -p tcp --syn --dport 80 -m connlimit --connlimit-above 15 --connlimit-mask 32 -j REJECT --reject-with tcp-reset");
+    sysexec(true, "iptables", "-t filter -A webadmin-service -i br0 -p tcp --dport %s -j ACCEPT", webport);
+
+    if(config_item_active("firewall.basic.wanaccess"))
+        sysexec(true, "iptables", "-t filter -A webadmin-service -p tcp --dport %s -j ACCEPT", webport);
+
+    if(!startup)
+    {
+        sysexec_shell("sleep 10 && killall -9 httpd && httpd -c /etc/httpd.conf -p 0.0.0.0:%s >/dev/null 2>&1 &", webport);
+    }
+    else
+        sysexec(false, "httpd", "-c /etc/httpd.conf -p 0.0.0.0:%s", webport);
+}
+
 void qos_start()
 {
     char *clearqos = "tc qdisc del dev ifb0 root >/dev/null 2>&1\n"
@@ -1832,6 +1852,7 @@ void sysinit_main(int argc, char **argv)
     cron_start(true);       DEBUG("cron done");
     ntpd_start(true);       DEBUG("ntpd done");
     qos_start();            DEBUG("qos done");
+    webserver_start(true);  DEBUG("webserver done");
     miniupnpd_start();      DEBUG("miniupnpd done");
     dropbear_start();       DEBUG("dropbear done");
 
