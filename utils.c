@@ -780,6 +780,8 @@ void config_adapt()
             { cJSON_String, &sub2, NULL, "macdefault", "" },
             { cJSON_String, &sub2, NULL, "mtu", "1500" },
             { cJSON_String, &sub2, NULL, "disable_nat", "false" },
+            { cJSON_String, &sub2, NULL, "enable_vlan", "false" },
+            { cJSON_String, &sub2, NULL, "vlan_id", "1" },
 
             { cJSON_Object, &sub1, &sub2, "wangsm", NULL },
             { cJSON_String, &sub2, NULL, "active", "false" },
@@ -964,21 +966,30 @@ void sysctlwrite(char *path, int value)
 }
 
 //! write directly to proc files
-void procwrite(char *path, char *value)
+void procwrite(char *path, char *fmt, ...)
 {
+    char *buf;
     FILE *fp;
 
-    DEBUG("proc write %s: %s", path, value);
+    va_list argp;
+    va_start(argp, fmt);
+    vasprintf(&buf, fmt, argp);
+
+    DEBUG("proc write %s: %s", path, buf);
 
     fp = fopen(path, "w");
     if(!fp)
     {
         DEBUG("Failed to open path %s", path);
+        free(buf);
         return;
     }
 
-    fprintf(fp, "%s\n", value);
+    fprintf(fp, "%s\n", buf);
     fclose(fp);
+
+    free(buf);
+
 }
 
 void print_log(char *fmt, ...)

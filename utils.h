@@ -115,7 +115,7 @@ const char *wan_devname();
 
 char *config_read_string(char *cfgpath);
 void sysctlwrite(char *path, int value);
-void procwrite(char *path, char *value);
+void procwrite(char *path, char *fmt, ...);
 void print_log(char *fmt, ...);
 bool save_configfile(const char *name, const char *fmt, ...);
 bool concat_configfile(const char *name, const char *fmt, ...);
