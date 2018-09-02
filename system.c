@@ -598,9 +598,9 @@ void wan_start(bool startup)
 
         // dual stack IPv6
         if(IS(v4pwd,v6pwd) && IS(v4usr, v6usr))
-            write_textfile("/etc/pppd.conf", "+ipv6 ipv6cp-use-ipaddr", true);
+            write_textfile("/etc/pppd.conf", "+ipv6 ipv6cp-use-ipaddr\n", true);
         else
-            write_textfile("/etc/pppd.conf", "noipv6", true);
+            write_textfile("/etc/pppd.conf", "noipv6\n", true);
 
         if(!is_empty(mac))
             sysexec(true, "ip", "link set %s address %s", "eth1", mac);
