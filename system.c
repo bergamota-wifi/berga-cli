@@ -544,7 +544,18 @@ void wan_start(bool startup)
         if(startup)
         {
             procwrite("/proc/rtk_vlan_support", "1");
-            procwrite("/proc/eth1/mib_vlan", "0 1 0 0 0 0 0");  // change port to LAN
+
+            // global vlan
+            if(config_item_active("network.wan.enable_vlan"))
+            {
+                char *vlanid = config_read_string("network.wan.vlan_id");
+
+                //global_vlan, is_lan, vlan, tag, id, pri, cfi, forwarding_rule
+                procwrite("/proc/eth1/mib_vlan", "1 0 1 1 %s 0 0 0", vlanid);  // change port to LAN
+            }
+            else
+                procwrite("/proc/eth1/mib_vlan", "0 1 0 0 0 0 0 0");  // internal chip vlan
+                
 
             sysexec(true, "brctl", "addif br0 %s", "eth1");
             sysexec(true, "ip", "link set %s up", "eth1");
@@ -552,7 +563,7 @@ void wan_start(bool startup)
 
         return;
     }
-
+    else
     if(IS(wifiopmode, "repeater"))
     {
         DEBUG("WLAN is in repeater mode");
@@ -568,7 +579,7 @@ void wan_start(bool startup)
 
         return;
     }
-
+    else
     if(IS(mode, "pppoe"))
     {
         char *buf;
