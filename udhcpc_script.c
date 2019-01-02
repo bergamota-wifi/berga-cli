@@ -43,9 +43,9 @@ void udhcpc_lease_command(char *cmd)
     if(IS(cmd, "deconfig"))
     {
         // remove any associated IP address
-        sysexec(true, "ip", "addr flush %s", iface);
-        sysexec(true, "ip", "route flush dev %s", iface);
-        sysexec(true, "ip", "route flush table wan1");
+        sysexec(true, "ip", "-4 addr flush %s", iface);
+        sysexec(true, "ip", "-4 route flush dev %s", iface);
+        sysexec(true, "ip", "-4 route flush table wan1");
 
         if(ipaddr)
             sysexec(true, "iptables", "-D output-masq -t nat -o %s -j SNAT --to-source %s", iface, ipaddr);
@@ -93,15 +93,11 @@ void udhcpc_lease_command(char *cmd)
 
         // single outgoing route
 #if 1
-        sysexec(true, "ip", "addr flush dev %s", iface);
-        sysexec(true, "ip", "addr add %s/%s dev %s", ipaddr, netmask, iface);
-        sysexec(true, "ip", "link set %s up", iface);
+        sysexec(true, "ip", "-4 addr flush dev %s", iface);
+        sysexec(true, "ip", "-4 addr add %s/%s dev %s", ipaddr, netmask, iface);
+        sysexec(true, "ip", "-4 route replace default table main via %s dev %s", router, iface);
 
-        sysexec(true, "route", "del default");
-        sysexec(true, "route", "add default gw %s dev %s", router, iface);
-        //sysexec(true, "ip", "route replace default table main via %s dev %s", router, iface);
-
-        sysexec(true, "ip", "route flush cache");
+        sysexec(true, "ip", "-4 route flush cache");
         sysexec(true, "iptables", "-F output-masq -t nat");
 
         if(!config_item_active("network.wan.disable_nat"))

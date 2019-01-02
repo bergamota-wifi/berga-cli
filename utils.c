@@ -600,6 +600,8 @@ bool config_replace_item(const char *cfgpath, int which, cJSON *item)
     return true;
 }
 
+//! reads a configuration path node, returns a pointer to the
+// json struct loaded on memory. no free is needed after calling it
 char *config_read_string(char *cfgpath)
 {
     cJSON *next = config_get_node(cfgpath);
@@ -608,11 +610,9 @@ char *config_read_string(char *cfgpath)
     {
         if(next->type == cJSON_String)
             return next->valuestring;
-        else
-            return "";
     }
-    else
-        return "";
+
+    return "";
 }
 
 //! returns boolean true if field content is "true"
@@ -716,7 +716,7 @@ void config_adapt()
             { cJSON_String, &sub2, NULL, "active", "true" },
             { cJSON_String, &sub2, NULL, "hidden", "false" },
             { cJSON_String, &sub2, NULL, "opmode", "master" },
-            { cJSON_String, &sub2, NULL, "mode", "n" },
+            { cJSON_String, &sub2, NULL, "band", "bgn" },
             { cJSON_String, &sub2, NULL, "channel", "1" },
             { cJSON_String, &sub2, NULL, "encryption", "wpa2-aes" },
             { cJSON_String, &sub2, NULL, "isolation", "false" },
@@ -724,6 +724,8 @@ void config_adapt()
             { cJSON_String, &sub2, NULL, "txrate", "max" },
             { cJSON_String, &sub2, NULL, "threshold", "false" },
             { cJSON_String, &sub2, NULL, "min_signal", "15" },
+            { cJSON_String, &sub2, NULL, "40mhz_width", "true" },
+            { cJSON_String, &sub2, NULL, "regulatory", "fcc" }, // fcc, mkk, worldwide
 
             { cJSON_Object, &sub1, &sub2, "primary_wireless", NULL },
             { cJSON_String, &sub2, NULL, "active", "true" },
@@ -767,7 +769,6 @@ void config_adapt()
             { cJSON_String, &sub2, NULL, "macaddr", "" },
 
             { cJSON_Object, &sub1, &sub2, "wan", NULL },
-            { cJSON_String, &sub2, NULL, "opmode", "gateway" },
             { cJSON_String, &sub2, NULL, "mode", "dhcp" },
             { cJSON_String, &sub2, NULL, "hostname", "" },
             { cJSON_String, &sub2, NULL, "pppoe_username", "" },
@@ -843,6 +844,16 @@ void config_adapt()
             { cJSON_String, &sub1, NULL, "username", "" },
             { cJSON_String, &sub1, NULL, "password", "" },
             { cJSON_String, &sub1, NULL, "domain", "" },
+
+        { cJSON_Object, &json_root, &sub1, "vpn", NULL },
+            { cJSON_String, &sub1, NULL, "active", "false" },
+            { cJSON_String, &sub1, NULL, "mode", "" },  // server,client
+            { cJSON_String, &sub1, NULL, "client_address", "" },
+            { cJSON_String, &sub1, NULL, "server_address", "" },
+            { cJSON_String, &sub1, NULL, "connect_address", "" },
+            { cJSON_String, &sub1, NULL, "connect_port", "" },
+            { cJSON_String, &sub1, NULL, "listen_port", "1194" },
+            { cJSON_String, &sub1, NULL, "statickey", "" },
 
         { cJSON_Object, &json_root, &sub1, "remoteshell", NULL },
             { cJSON_String, &sub1, NULL, "active", "true" },

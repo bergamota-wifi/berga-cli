@@ -363,7 +363,7 @@ void dnsmasq_start(bool startup)
                             "%s bergamota-ng";
 
     // disable DNSmasq when bridge mode is active
-    if(IS(config_read_string("network.wan.opmode"), "bridge"))
+    if(IS(config_read_string("network.wan.mode"), "bridge"))
     {
         char *dns1 = config_read_string("network.dns.dns1");
 
@@ -514,7 +514,6 @@ void dnsmasq_start(bool startup)
 
 void wan_start(bool startup)
 {
-    char *opmode = config_read_string("network.wan.opmode");
     char *wifiopmode = config_read_string("network.wireless.opmode");
     char *mode = config_read_string("network.wan.mode");
     char *mac = config_read_string("network.wan.macaddr");
@@ -527,17 +526,16 @@ void wan_start(bool startup)
 
     if(!startup)
     {
-        sysexec(true, "ip", "route flush table main dev %s", "eth1");
-        sysexec(true, "ip", "addr flush dev %s", "eth1");
-        sysexec(true, "ip", "addr -f inet6 flush dev %s", "eth1");
-        sysexec(true, "ip", "link set %s down", "eth1");
+        sysexec(true, "ip", "link set eth1 down");
+        sysexec(true, "ip", "-4 addr flush dev eth1");
+        sysexec(true, "ip", "-4 route flush table main dev eth1");
         sysexec(true, "iptables", "-F output-masq -t nat");
         syskill("dhclient");
         syskill("udhcpc");
         syskill("pppd");
     }
 
-    if(IS(opmode, "bridge"))
+    if(IS(mode, "bridge"))
     {
         DEBUG("WAN is in bridge mode");
 
@@ -614,9 +612,9 @@ void wan_start(bool startup)
             write_textfile("/etc/pppd.conf", "noipv6\n", true);
 
         if(!is_empty(mac))
-            sysexec(true, "ip", "link set %s address %s", "eth1", mac);
+            sysexec(true, "ip", "link set eth1 address %s", mac);
 
-        sysexec(true, "ip", "link set %s up", "eth1");
+        sysexec(true, "ip", "link set eth1 up");
         sysexec(false, "pppd", "file /etc/pppd.conf");
 
         free(buf);
@@ -624,34 +622,33 @@ void wan_start(bool startup)
     else if(IS(mode, "dhcp"))
     {
         if(!is_empty(mtu))
-            sysexec(true, "ip", "link set %s mtu %s", "eth1", mtu);
+            sysexec(true, "ip", "link set eth1 mtu %s", mtu);
         
         if(!is_empty(mac))
-            sysexec(true, "ip", "link set %s address %s", "eth1", mac);
+            sysexec(true, "ip", "link set eth1 address %s", mac);
 
         // obtain an IP lease trought DHCP
-        sysexec(true, "ip", "link set %s up", "eth1");
-        sysexec(false, "udhcpc", "-S -b -s /usr/bin/udhcpc-script -i %s", "eth1");
+        sysexec(true, "ip", "link set eth1 up");
+        sysexec(false, "udhcpc", "-S -b -s /usr/bin/udhcpc-script -i eth1");
     }
     else if(IS(mode, "static"))
     {
         if(!is_empty(mtu))
-            sysexec(true, "ip", "link set %s mtu %s", "eth1", mtu);
+            sysexec(true, "ip", "link set eth1 mtu %s", mtu);
         if(!is_empty(mac))
-            sysexec(true, "ip", "link set %s address %s", "eth1", mac);
+            sysexec(true, "ip", "link set eth1 address %s", mac);
 
-        sysexec(true, "ip", "addr flush dev %s", "eth1");
-        sysexec(true, "ip", "addr add %s/%s dev %s", config_read_string("network.wan.ipaddr"),
-                                                     config_read_string("network.wan.netmask"),
-                                                     "eth1");
+        sysexec(true, "ip", "-4 addr flush dev eth1");
+        sysexec(true, "ip", "-4 addr add %s/%s dev eth1", config_read_string("network.wan.ipaddr"),
+                                                     config_read_string("network.wan.netmask"));
 
-        sysexec(true, "ip", "link set %s up", "eth1");
+        sysexec(true, "ip", "link set eth1 up");
         sysexec(true, "route", "del default");
-        sysexec(true, "route", "add default gw %s dev %s", config_read_string("network.wan.gateway"), "eth1");
+        sysexec(true, "route", "add default gw %s dev eth1", config_read_string("network.wan.gateway"));
         //sysexec(true, "ip", "route replace default table main via %s dev %s", config_read_string("network.wan.gateway"), "eth1");
 
         if(!config_item_active("network.wan.disable_nat"))
-            sysexec(true, "iptables", "-A output-masq -t nat -o %s -j SNAT --to-source %s", "eth1", config_read_string("network.wan.ipaddr"));
+            sysexec(true, "iptables", "-A output-masq -t nat -o eth1 -j SNAT --to-source %s", config_read_string("network.wan.ipaddr"));
 
         // write dns servers
         if(config_item_active("network.dns.active"))
@@ -684,36 +681,30 @@ void wan_start(bool startup)
         return;
     }
 
+    // global vlan
+    if(config_item_active("network.wan.enable_vlan"))
+    {
+        char *vlanid = config_read_string("network.wan.vlan_id");
+
+        //global_vlan, is_lan, vlan, tag, id, pri, cfi, forwarding_rule
+        procwrite("/proc/eth1/mib_vlan", "1 0 1 1 %s 0 0 0", vlanid);  // change global vlan ID
+        procwrite("/proc/rtk_vlan_support", "1");
+    }
+    else
+        procwrite("/proc/rtk_vlan_support", "0");
+
     // ipv6 address
     if(config_item_active("network.ipv6.active"))
     {
         char *mode = config_read_string("network.ipv6.wan_mode");
 
-        sysexec(true, "ip", "addr -f inet6 flush dev %s scope global", "eth1");
-
-        // if(IS(mode, "slaac"))
-        // {
-        //     // force kernel to accept RA announcement
-        //     sysctlwrite("net.ipv6.conf.eth1.accept_ra", 2);
-
-        //     const char *script = "sleep 5\n"
-        //                          "PREFIX=$(rdisc6 eth1 | awk 'BEGIN {FS=\":| +\"; OFS=\":\"}{ if($2==\"Prefix\") print $5,$6,$7,$8 }')\n"
-        //                          "ADDR=$(ipaddr -6 show dev br0 scope link | awk 'BEGIN {FS=\":| +\"; OFS=\":\"}{ if($2==\"inet6\") print $5,$6,$7,$8 }')\n"
-        //                          "ipaddr -6 add $PREFIX:$ADDR dev br0\n"
-        //                          "ip -6 route del default\n"
-        //                          "ip route add ::/0 dev eth1";
-
-        //     sysexec_shell(script);
-        // }
-        // else
+        sysexec(true, "sysctl", "-w net.ipv6.conf.all.autoconf=1");
+        sysexec(true, "sysctl", "-w net.ipv6.conf.all.accept_ra=0");
+        sysexec(true, "sysctl", "-w net.ipv6.conf.default.autoconf=1");
+        sysexec(true, "sysctl", "-w net.ipv6.conf.default.accept_ra=0");
+  
         if(IS(mode, "dhcp"))
         {
-            // force kernel to accept wan RA announcement
-            sysctlwrite("net.ipv6.conf.eth1.accept_ra", 2);
-            sysexec(true, "ip", "link set eth1 down");
-            sysexec(true, "ip", "link set eth1 up");
-
-            sysexec_shell("sleep 10 && dhclient -6 -P -sf /usr/bin/ipv6.sh -nw %s >/dev/null 2>&1 &", "eth1");
         }
         else
         if(IS(mode, "pppoe"))
@@ -721,8 +712,6 @@ void wan_start(bool startup)
             // dual stack IPv6
             if(IS(v4pwd,v6pwd) && IS(v4usr, v6usr))
             {
-                sysexec(true, "ipv6_duid.sh", "");
-                //sysexec_shell("sleep 15 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw pppv4 >/dev/null 2>&1 &");
             }
             else
             {
@@ -752,11 +741,8 @@ void wan_start(bool startup)
 
                 write_textfile("/etc/pppd6.conf", buf, false);
 
-                sysexec(true, "ip", "link set %s up", "eth1");
+                sysexec(true, "ip", "link set eth1 up");
                 sysexec(false, "pppd", "file /etc/pppd6.conf");
-
-                sysexec(true, "ipv6_duid.sh", "");
-                //sysexec_shell("sleep 15 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw pppv6 >/dev/null 2>&1 &");
 
                 free(buf);
             }
@@ -768,72 +754,69 @@ void wan_start(bool startup)
                                  "ADDR2=$(ipaddr -6 show dev br0 scope link | awk 'BEGIN {FS=\":| +\"; OFS=\":\"}{ if($2==\"inet6\") print $5,$6,$7,$8 }')\n"
                                  "ipaddr -6 add $ADDR1:$ADDR2 dev br0\n";
 
-            sysexec(true, "ip", "addr -f inet6 add %s/%s dev %s", config_read_string("network.ipv6.wan_addr"),
-                                                            config_read_string("network.ipv6.wan_prefix"),
-                                                            "eth1");
+            sysexec(true, "ip", "addr -f inet6 add %s/%s dev eth1", config_read_string("network.ipv6.wan_addr"),
+                                                            config_read_string("network.ipv6.wan_prefix"));
 
-            sysexec(true, "ip", "route -6 add ::/0 dev %s", "eth1");
-            sysexec(true, "ip", "route -6 add default gw %s dev %s", config_read_string("network.ipv6.wan_gateway"), "eth1");
+            sysexec(true, "ip", "route -6 add ::/0 dev eth1");
+            sysexec(true, "ip", "route -6 add default gw %s dev eth1", config_read_string("network.ipv6.wan_gateway"));
 
             sysexec_shell(script);
         }
+
+        sysexec(true, "ip", "link set eth1 up");
     }
 }
 
 void lan_start(bool startup)
 {
-    struct hw_header hw;
-
     if(startup)
     {
-        read_hw_settings(&hw);
+        char *mac = config_read_string("network.lan.macaddr");
+        char *gw = config_read_string("network.wan.gateway");
 
-        // remaining ports hwaddr
-        sysexec(true, "ip", "link set eth0 address %s", config_read_string("network.lan.macaddr"));
-        sysexec(true, "ip", "link set eth2 address %s", ether_ntoa_z(&hw.nic[6]));
-        sysexec(true, "ip", "link set eth3 address %s", ether_ntoa_z(&hw.nic[7]));
-        sysexec(true, "ip", "link set eth4 address %s", ether_ntoa_z(&hw.nic[8]));
+        // main port hwaddr
+        sysexec(true, "ip", "link set eth0 address %s", mac);
 
+        // add wireless bridges
         sysexec(true, "brctl", "addbr br0");
-        sysexec(true, "ip", "link set br0 address %s", config_read_string("network.lan.macaddr"));
+        sysexec(true, "brctl", "addbr br1");
+        sysexec(true, "brctl", "addbr br2");
 
-        sysexec(true, "brctl", "addbr ""br1");
+        sysexec(true, "brctl", "addif br0 eth0");
+
+        // wireless bridges MAC address
+        sysexec(true, "ip", "link set br0 address %s", mac);
         sysexec(true, "ip", "link set br1 address %s", config_read_string("network.secondary_wireless.macaddr"));
-
-        sysexec(true, "brctl", "addbr ""br2");
         sysexec(true, "ip", "link set br2 address %s", config_read_string("network.third_wireless.macaddr"));
 
         // bridge all LAN ports
-        sysexec(true, "brctl", "addif br0 eth0");
-        sysexec(true, "brctl", "addif br0 eth2");
-        sysexec(true, "brctl", "addif br0 eth3");
-        sysexec(true, "brctl", "addif br0 eth4");
-    }
-
-    sysexec(true, "ip", "addr flush dev br0");
-    sysexec(true, "ip", "addr add %s/%s dev br0", config_read_string("network.lan.ipaddr"),
-                                                     config_read_string("network.lan.netmask"));
-
-    // bridged mode gateway set on LAN side
-    if(IS(config_read_string("network.wan.opmode"), "bridge"))
-    {
-        char *gw = config_read_string("network.wan.gateway");
-
-        if(!is_empty(gw))
+        // bridged mode gateway set on LAN side
+        if(IS(config_read_string("network.wan.mode"), "bridge"))
         {
-            sysexec(true, "ip", "link set br0 up");
-            sysexec(true, "route", "del default");
-            sysexec(true, "route", "add default gw %s dev br0", gw);
-            //sysexec(true, "ip", "route replace default table main via %s dev br0", gw);
-        }
-    }
+            // set remaining ports MAC to the same address
+            sysexec(true, "ip", "link set eth2 address %s", mac);
+            sysexec(true, "ip", "link set eth3 address %s", mac);
+            sysexec(true, "ip", "link set eth4 address %s", mac);
 
-    if(startup)
-    {
+            // add remaining ports to the bridge
+            sysexec(true, "brctl", "addif br0 eth2");
+            sysexec(true, "brctl", "addif br0 eth3");
+            sysexec(true, "brctl", "addif br0 eth4");
+
+            // set them up
+            sysexec(true, "ip", "link set eth2 up");
+            sysexec(true, "ip", "link set eth3 up");
+            sysexec(true, "ip", "link set eth4 up");
+
+            if(!is_empty(gw))
+            {
+                sysexec(true, "ip", "link set br0 up");
+                sysexec(true, "route", "del default");
+                sysexec(true, "route", "add default gw %s dev br0", gw);
+            }
+        }
+
         sysexec(true, "ip", "link set eth0 up");
-        sysexec(true, "ip", "link set eth2 up");
-        sysexec(true, "ip", "link set eth3 up");
-        sysexec(true, "ip", "link set eth4 up");
         sysexec(true, "ip", "link set br0 up");
         sysexec(true, "ip", "link set br1 up");
         sysexec(true, "ip", "link set br2 up");
@@ -841,6 +824,10 @@ void lan_start(bool startup)
 
         procwrite("/proc/sw_nat", "9");
     }
+
+    sysexec(true, "ip", "-4 addr flush dev br0");
+    sysexec(true, "ip", "-4 addr add %s/%s dev br0", config_read_string("network.lan.ipaddr"),
+                                                     config_read_string("network.lan.netmask"));
 }
 
 void wireless_start(bool startup)
@@ -848,7 +835,7 @@ void wireless_start(bool startup)
     struct hw_header hw;
     int channel;
     char *txrate;
-    char *mode, *opmode, *sysopmode;
+    char *regulatory, *band, *opmode, *sysopmode;
     int rssi;
     int txpower = 0;
 
@@ -858,10 +845,11 @@ void wireless_start(bool startup)
 
         channel = atoi(config_read_string("network.wireless.channel"));
         txrate = config_read_string("network.wireless.txrate");
-        mode = config_read_string("network.wireless.mode");
+        band = config_read_string("network.wireless.band");
         opmode = config_read_string("network.wireless.opmode");
-        sysopmode = config_read_string("network.wan.opmode");
+        sysopmode = config_read_string("network.wan.mode");
         txpower = atoi(config_read_string("network.wireless.txpower"));
+        regulatory = config_read_string("network.wireless.regulatory");
 
         if(txpower>17)
             txpower = 0;
@@ -872,17 +860,18 @@ void wireless_start(bool startup)
             rssi = 0;
 
         // root interface
-        fprintf(cfg, "wlan0_regdomain=1\n");
         fprintf(cfg, "wlan0_disable_txpwrlmt=1\n");
         fprintf(cfg, "wlan0_led_type=7\n");
         fprintf(cfg, "wlan0_shortGI20M=1\n");
         fprintf(cfg, "wlan0_shortGI40M=1\n");
-        fprintf(cfg, "wlan0_stbc=1\n");
-        fprintf(cfg, "wlan0_ampdu=1\n");
-        fprintf(cfg, "wlan0_amsdu=0\n");
+        fprintf(cfg, "wlan0_stbc=0\n");     // Space–time block coding
+        fprintf(cfg, "wlan0_ampdu=1\n");    // Aggregated MAC Protocol Data Unit
+        fprintf(cfg, "wlan0_amsdu=1\n");
         fprintf(cfg, "wlan0_disable_protection=1\n");
         fprintf(cfg, "wlan0_qos_enable=1\n");
         fprintf(cfg, "wlan0_coexist=0\n");
+        fprintf(cfg, "wlan0_use40M=%d\n", config_item_active("network.wireless.40mhz_width"));
+        fprintf(cfg, "wlan0_channel=%d\n", channel);
 
         if(config_item_active("network.wireless.isolation"))
         {
@@ -897,25 +886,23 @@ void wireless_start(bool startup)
             fprintf(cfg, "wlan0-va2_block_relay=0\n");
         }
 
-        fprintf(cfg, "wlan0_channel=%d\n", channel);
+        if(IS(regulatory, "worldwide"))
+            fprintf(cfg, "wlan0_regdomain=15\n");
+        else
+        if(IS(regulatory, "mkk"))
+            fprintf(cfg, "wlan0_regdomain=6\n");
+        else
+        if(IS(regulatory, "fcc"))
+            fprintf(cfg, "wlan0_regdomain=1\n");
 
         if(IS(txrate, "max"))
-        {
             fprintf(cfg, "wlan0_fixrate=0\n");
-            fprintf(cfg, "wlan0_use40M=1\n");
-        }
         else
         if(IS(txrate, "54"))
-        {
             fprintf(cfg, "wlan0_fixrate=12\n");
-            fprintf(cfg, "wlan0_use40M=0\n");
-        }
         else
         if(IS(txrate, "11"))
-        {
             fprintf(cfg, "wlan0_fixrate=4\n");
-            fprintf(cfg, "wlan0_use40M=0\n");
-        }
 
         if(channel < 5)
             fprintf(cfg, "wlan0_2ndchoffset=2\n");
@@ -985,14 +972,20 @@ void wireless_start(bool startup)
             fprintf(cfg, "wlan0_ssid=\"%s\"\n", config_read_string("network.primary_wireless.ssid"));
             fprintf(cfg, "wlan0_vap_enable=1\n");
 
-            if(IS(mode, "b"))
-                fprintf(cfg, "wlan0_band=1\n");  // B
+            if(IS(band, "b"))
+                fprintf(cfg, "wlan0_band=1\n");  // B (non mixed)
             else
-            if(IS(mode, "g"))
-                fprintf(cfg, "wlan0_band=3\n");  // B/G
+            if(IS(band, "bg"))
+                fprintf(cfg, "wlan0_band=3\n");  // B/G (mixed mode)
             else
-            if(IS(mode, "n"))
-                fprintf(cfg, "wlan0_band=11\n");  // B/G/N
+            if(IS(band, "bgn"))
+                fprintf(cfg, "wlan0_band=11\n");  // B/G/N (mixed mode)
+            else
+            if(IS(band, "g"))
+                fprintf(cfg, "wlan0_band=2\n");  // G Only (non mixed)
+            else
+            if(IS(band, "n"))
+                fprintf(cfg, "wlan0_band=8\n");  // N Only (non mixed)
 
             if(config_item_active("network.wireless.threshold"))
                 fprintf(cfg, "wlan0_sta_asoc_rssi_th=%d\n", rssi);
@@ -1070,13 +1063,13 @@ void wireless_start(bool startup)
             fprintf(cfg, "wlan0-va1_ssid=\"%s\"\n", config_read_string("network.secondary_wireless.ssid"));
             fprintf(cfg, "wlan0-va1_vap_enable=1\n");
 
-            if(IS(mode, "b"))
+            if(IS(band, "b"))
                 fprintf(cfg, "wlan0-va1_band=1\n");  // B
             else
-            if(IS(mode, "g"))
+            if(IS(band, "g"))
                 fprintf(cfg, "wlan0-va1_band=3\n");  // B/G
             else
-            if(IS(mode, "n"))
+            if(IS(band, "n"))
                 fprintf(cfg, "wlan0-va1_band=11\n");  // B/G/N
 
             if(config_item_active("network.wireless.threshold"))
@@ -1151,13 +1144,13 @@ void wireless_start(bool startup)
             fprintf(cfg, "wlan0-va2_ssid=\"%s\"\n", config_read_string("network.third_wireless.ssid"));
             fprintf(cfg, "wlan0-va2_vap_enable=1\n");
 
-            if(IS(mode, "b"))
+            if(IS(band, "b"))
                 fprintf(cfg, "wlan0-va2_band=1\n");  // B
             else
-            if(IS(mode, "g"))
+            if(IS(band, "g"))
                 fprintf(cfg, "wlan0-va2_band=3\n");  // B/G
             else
-            if(IS(mode, "n"))
+            if(IS(band, "n"))
                 fprintf(cfg, "wlan0-va2_band=11\n");  // B/G/N
 
             if(config_item_active("network.wireless.threshold"))
@@ -1324,7 +1317,7 @@ void wireless_start(bool startup)
         if(config_item_active("network.primary_wireless.active"))
             sysexec(true, "ip", "link set %s up", "wlan0");
 
-        sysexec(true, "ip", "addr flush dev %s", "br1");
+        sysexec(true, "ip", "-4 addr flush dev %s", "br1");
         if(config_item_active("network.secondary_wireless.active"))
         {
             // set secondary interface IP address
@@ -1337,7 +1330,7 @@ void wireless_start(bool startup)
         else
             sysexec(true, "ip", "link set %s down", "wlan0-va1");
 
-        sysexec(true, "ip", "addr flush dev %s", "br2");
+        sysexec(true, "ip", "-4 addr flush dev %s", "br2");
         if(config_item_active("network.third_wireless.active"))
         {
             // set third interface IP address
@@ -1659,6 +1652,55 @@ void dropbear_start()
             sysexec(true, "iptables", "-t filter -A services-inbound -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p tcp --dport 22 -j ACCEPT");
 
         sysexec(true, "dropbear", "-p 0.0.0.0:22");
+    }
+}
+
+void openvpn_start(bool startup)
+{
+    size_t size;
+    FILE *f;
+
+    if(config_item_active("vpn.active"))
+    {
+        char *mode = config_read_string("vpn.mode");
+        char *key = config_read_string("vpn.statickey");
+        char *listen_port = config_read_string("vpn.listen_port");
+        char *buf;
+
+        if(is_empty(key))
+        {
+            sysexec(true, "openvpn", "--genkey --secret /etc/static.key");
+            size = read_file(&key, "/etc/static.key");
+
+            // save file content afer generating it
+            if(size)
+            {
+                buf = (char *)malloc(Base64encode_len(size));
+                Base64encode(buf, key, size);
+
+                config_write_string("vpn.statickey", buf);
+                free(buf);
+                free(key);
+            }
+
+            config_save(true);
+        }
+        else
+        {
+            // file already generated, load it
+            size = Base64decode_len(key);
+            if(size)
+            {
+                buf = (char *)malloc(size);
+                Base64decode(buf, key);
+
+                f = fopen("/etc/static.key", "wb");
+                fwrite(buf, size, 1, f);
+                fclose(f);
+
+                free(buf);
+            }
+        }
     }
 }
 

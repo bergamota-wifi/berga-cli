@@ -46,8 +46,8 @@ void pppd_script_command(int argc, char **argv)
         sysexec_shell("ip route del %s dev %s src %s table main", gateway, iface, ipaddr);
 
         // flush old records
-        sysexec_shell("ip route flush dev %s", iface);
-        sysexec_shell("ip route flush table wan1");
+        sysexec_shell("ip -4 route flush dev %s", iface);
+        sysexec_shell("ip -4 route flush table wan1");
 
         sysexec_shell("ip", "rule del from %s table wan1", ipaddr);
         sysexec_shell("ip", "rule del fwmark 1 table wan1");
