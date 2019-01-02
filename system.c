@@ -338,10 +338,10 @@ void miniupnpd_start()
 
 void dnsmasq_start(bool startup)
 {
-//    in_addr_t addr;
-//    in_addr_t mask;
-//    struct in_addr start;
-//    struct in_addr end;
+   in_addr_t addr;
+   in_addr_t mask;
+   struct in_addr start;
+   struct in_addr end;
 
     const char *conf = "user=nobody\n"
                        "group=nobody\n"
@@ -383,14 +383,6 @@ void dnsmasq_start(bool startup)
         save_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,%sh\n", config_read_string("network.dhcp.start"),
                                                                          config_read_string("network.dhcp.end"),
                                                                          config_read_string("network.dhcp.leasetime"));
-
-        concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,%sh\n", config_read_string("network.dhcp.secondary_start"),
-                                                                           config_read_string("network.dhcp.secondary_end"),
-                                                                           config_read_string("network.dhcp.leasetime"));
-
-        concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,%sh\n", config_read_string("network.dhcp.third_start"),
-                                                                           config_read_string("network.dhcp.third_end"),
-                                                                           config_read_string("network.dhcp.leasetime"));
     }
 
     save_configfile("/etc/dnsmasq.d/fwdns", "host-record=bergamota-ng,%s\n", config_read_string("network.lan.ipaddr"));
@@ -486,25 +478,23 @@ void dnsmasq_start(bool startup)
         }
     }
 
-//    // secondary wifi network address
-//    addr = a_to_hl(config_read_string("network.secondary_wireless.ipaddr"));
-//    mask = a_to_hl(config_read_string("network.secondary_wireless.netmask"));
-//
-//    // calc last IP address
-//    start.s_addr = htonl(addr+1);
-//    end.s_addr = htonl((addr|~mask)-1);
-//    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,", inet_ntoa(start));
-//    concat_configfile("/etc/dnsmasq.d/dhcp", "%s,1h\n", inet_ntoa(end));
-//
-//    // third wifi network address
-//    addr = a_to_hl(config_read_string("network.third_wireless.ipaddr"));
-//    mask = a_to_hl(config_read_string("network.third_wireless.netmask"));
-//
-//    // calc last IP address
-//    start.s_addr = htonl(addr+1);
-//    end.s_addr = htonl((addr|~mask)-1);
-//    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,", inet_ntoa(start));
-//    concat_configfile("/etc/dnsmasq.d/dhcp", "%s,1h\n", inet_ntoa(end));
+    // secondary wifi network address
+    addr = a_to_hl(config_read_string("network.secondary_wireless.ipaddr"));
+    mask = a_to_hl(config_read_string("network.secondary_wireless.netmask"));
+
+    // calc last IP address
+    start.s_addr = htonl(addr+1);
+    end.s_addr = htonl((addr|~mask)-1);
+    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", inet_ntoa(start), inet_ntoa(end));
+
+    // third wifi network address
+    addr = a_to_hl(config_read_string("network.third_wireless.ipaddr"));
+    mask = a_to_hl(config_read_string("network.third_wireless.netmask"));
+
+    // calc last IP address
+    start.s_addr = htonl(addr+1);
+    end.s_addr = htonl((addr|~mask)-1);
+    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", inet_ntoa(start), inet_ntoa(end));
 
     if(!startup)
         syskill("dnsmasq");
@@ -1726,6 +1716,13 @@ void webserver_start(bool startup)
 
 void qos_start()
 {
+    char *primary_up = config_read_string("network.qos.primary_upload");
+    char *primary_down = config_read_string("network.qos.primary_download");
+    char *secondary_up = config_read_string("network.qos.secondary_upload");
+    char *secondary_down = config_read_string("network.qos.secondary_download");
+    char *third_up = config_read_string("network.qos.third_upload");
+    char *third_down = config_read_string("network.qos.third_download");
+
     char *clearqos = "tc qdisc del dev ifb0 root >/dev/null 2>&1\n"
                      "tc qdisc del dev br0 root >/dev/null 2>&1\n"
                      "tc qdisc del dev br1 root >/dev/null 2>&1\n"
@@ -1740,13 +1737,6 @@ void qos_start()
     sysexec_shell("tc qdisc add dev br2 root handle 1: htb");
     procwrite("/proc/fast_nat", "1");
 
-    char *primary_up = config_read_string("network.qos.primary_upload");
-    char *primary_down = config_read_string("network.qos.primary_download");
-    char *secondary_up = config_read_string("network.qos.secondary_upload");
-    char *secondary_down = config_read_string("network.qos.secondary_download");
-    char *third_up = config_read_string("network.qos.third_upload");
-    char *third_down = config_read_string("network.qos.third_download");
-
     // ingress (upload)
     sysexec_shell("tc qdisc add dev br0 handle ffff ingress");
     sysexec_shell("tc filter add dev br0 parent ffff: protocol ip u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev ifb0");
@@ -1758,7 +1748,6 @@ void qos_start()
     // ingress (upload)
     sysexec_shell("tc qdisc add dev br2 handle ffff ingress");
     sysexec_shell("tc filter add dev br2 parent ffff: protocol ip u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev ifb0");
-
 
     cJSON *next = config_get_node("network.dhcp.leases");
 
@@ -1866,7 +1855,7 @@ void sysinit_main(int argc, char **argv)
     procwrite("/proc/gpio", "2");
 
     // set approximate date
-    sysexec(false, "date", "-s 2018-01-01");
+    sysexec(false, "date", "-s 2019-01-01");
 
     sysctlwrite("kernel.printk", 0);
 

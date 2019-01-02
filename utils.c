@@ -811,10 +811,6 @@ void config_adapt()
             { cJSON_String, &sub2, NULL, "active", "true" },
             { cJSON_String, &sub2, NULL, "start", "172.16.1.2" },
             { cJSON_String, &sub2, NULL, "end", "172.16.1.254" },
-            { cJSON_String, &sub2, NULL, "secondary_start", "172.16.5.2" },
-            { cJSON_String, &sub2, NULL, "secondary_end", "172.16.5.254" },
-            { cJSON_String, &sub2, NULL, "third_start", "172.16.10.2" },
-            { cJSON_String, &sub2, NULL, "third_end", "172.16.10.254" },
             { cJSON_String, &sub2, NULL, "leasetime", "1" },
             { cJSON_Array, &sub2, &sub3, "leases", NULL },
 
