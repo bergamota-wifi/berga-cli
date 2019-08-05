@@ -23,8 +23,8 @@
 
 CC = rsdk-linux-gcc
 
-CFLAGS = -std=c99 -O0 -g -D_GNU_SOURCE
-LIBS = -lm
+CFLAGS += -std=c99 -O0 -g -D_GNU_SOURCE
+LIBS += -lm -lpthread -lresolv -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz
 
 SRC = $(wildcard *.c)
 OBJ = $(patsubst %.c,%.o,$(wildcard *.c))

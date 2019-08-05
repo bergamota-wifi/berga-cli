@@ -342,6 +342,7 @@ void dnsmasq_start(bool startup)
    in_addr_t mask;
    struct in_addr start;
    struct in_addr end;
+   char *p_start, *p_end;
 
     const char *conf = "user=nobody\n"
                        "group=nobody\n"
@@ -368,26 +369,26 @@ void dnsmasq_start(bool startup)
         char *dns1 = config_read_string("network.dns.dns1");
 
         if(!is_empty(dns1))
-            save_configfile("/etc/resolv.conf", "nameserver %s", dns1);
+            save_textfile("/etc/resolv.conf", "nameserver %s", dns1);
 
         return;
     }
 
-    save_configfile("/etc/dnsmasq.conf", conf, config_read_string("system.hostname"));
+    save_textfile("/etc/dnsmasq.conf", conf, config_read_string("system.hostname"));
 
     if(file_exists("/etc/dnsmasq.d/dhcp"))
         unlink("/etc/dnsmasq.d/dhcp");
 
     if(config_item_active("network.dhcp.active"))
     {
-        save_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,%sh\n", config_read_string("network.dhcp.start"),
+        save_textfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,%sh\n", config_read_string("network.dhcp.start"),
                                                                          config_read_string("network.dhcp.end"),
                                                                          config_read_string("network.dhcp.leasetime"));
     }
 
-    save_configfile("/etc/dnsmasq.d/fwdns", "host-record=bergamota-ng,%s\n", config_read_string("network.lan.ipaddr"));
+    save_textfile("/etc/dnsmasq.d/fwdns", "host-record=bergamota-ng,%s\n", config_read_string("network.lan.ipaddr"));
 
-    save_configfile("/etc/hosts", hostsfile, config_read_string("network.lan.ipaddr"));
+    save_textfile("/etc/hosts", hostsfile, config_read_string("network.lan.ipaddr"));
 
     if(file_exists("/etc/dnsmasq.d/fixedleases"))
         unlink("/etc/dnsmasq.d/fixedleases");
@@ -399,14 +400,14 @@ void dnsmasq_start(bool startup)
 
     if(config_item_active("network.secondary_wireless.active"))
     {
-        sysexec(true, "iptables", "-A dnsmasq-service -i %s -p udp -m udp --dport 53 -j ACCEPT", "br1");
-        sysexec(true, "iptables", "-A dnsmasq-service -i %s -p udp -m udp --dport 67 -j ACCEPT", "br1");
+        sysexec(true, "iptables", "-A dnsmasq-service -i br1 -p udp -m udp --dport 53 -j ACCEPT");
+        sysexec(true, "iptables", "-A dnsmasq-service -i br1 -p udp -m udp --dport 67 -j ACCEPT");
     }
     
     if(config_item_active("network.third_wireless.active"))
     {
-        sysexec(true, "iptables", "-A dnsmasq-service -i %s -p udp -m udp --dport 53 -j ACCEPT", "br2");
-        sysexec(true, "iptables", "-A dnsmasq-service -i %s -p udp -m udp --dport 67 -j ACCEPT", "br2");
+        sysexec(true, "iptables", "-A dnsmasq-service -i br2 -p udp -m udp --dport 53 -j ACCEPT");
+        sysexec(true, "iptables", "-A dnsmasq-service -i br2 -p udp -m udp --dport 67 -j ACCEPT");
     }
 
     // generate fixed leases file
@@ -457,25 +458,16 @@ void dnsmasq_start(bool startup)
                 }
             }
 
-            concat_configfile("/etc/dnsmasq.d/fixedleases", "dhcp-host=%s,%s,1h\n", mac, ipaddr);
+            concat_textfile("/etc/dnsmasq.d/fixedleases", "dhcp-host=%s,%s,1h\n", mac, ipaddr);
         }
     }
 
     // ipv6 address
     if(config_item_active("network.ipv6.active"))
     {
-        char *mode = config_read_string("network.ipv6.lan_mode");
-
-        if(IS(mode, "radv"))
-        {
-            write_textfile("/etc/dnsmasq.d/ipv6-ra", "enable-ra", false);
-            write_textfile("/etc/dnsmasq.d/ipv6-dhcp", "dhcp-range=tag:br*,::1,constructor:br*, ra-stateless, ra-names, 12h", false);
-        }
-        else
-        if(IS(mode, "dhcp"))
-        {
-            write_textfile("/etc/dnsmasq.d/ipv6-dhcp", "dhcp-range=::1, ::ffff:ffff, constructor:br*, ra-names, 64, 12h", false);
-        }
+        // enable router advertisement using DNSmasq, stateless assignment
+        save_textfile("/etc/dnsmasq.d/ipv6", "enable-ra\n");
+        concat_textfile("/etc/dnsmasq.d/ipv6", "dhcp-range=tag:br*, ::1, constructor:br*, ra-stateless, ra-names, 12h\n");
     }
 
     // secondary wifi network address
@@ -485,7 +477,9 @@ void dnsmasq_start(bool startup)
     // calc last IP address
     start.s_addr = htonl(addr+1);
     end.s_addr = htonl((addr|~mask)-1);
-    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", inet_ntoa(start), inet_ntoa(end));
+    p_start = inet_ntoa(start);
+    p_end = inet_ntoa(end);
+    concat_textfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", p_start, p_end);
 
     // third wifi network address
     addr = a_to_hl(config_read_string("network.third_wireless.ipaddr"));
@@ -494,7 +488,9 @@ void dnsmasq_start(bool startup)
     // calc last IP address
     start.s_addr = htonl(addr+1);
     end.s_addr = htonl((addr|~mask)-1);
-    concat_configfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", inet_ntoa(start), inet_ntoa(end));
+    p_start = inet_ntoa(start);
+    p_end = inet_ntoa(end);
+    concat_textfile("/etc/dnsmasq.d/dhcp", "dhcp-range=%s,%s,1h\n", p_start, p_end);
 
     if(!startup)
         syskill("dnsmasq");
@@ -511,8 +507,6 @@ void wan_start(bool startup)
 
     char *v4pwd = config_read_string("network.wan.pppoe_password");
     char *v4usr = config_read_string("network.wan.pppoe_username");
-    char *v6pwd = config_read_string("network.ipv6.pppoe_password");
-    char *v6usr = config_read_string("network.ipv6.pppoe_username");
 
     if(!startup)
     {
@@ -545,8 +539,8 @@ void wan_start(bool startup)
                 procwrite("/proc/eth1/mib_vlan", "0 1 0 0 0 0 0 0");  // internal chip vlan
                 
 
-            sysexec(true, "brctl", "addif br0 %s", "eth1");
-            sysexec(true, "ip", "link set %s up", "eth1");
+            sysexec(true, "brctl", "addif br0 eth1");
+            sysexec(true, "ip", "link set eth1 up");
         }
 
         return;
@@ -561,8 +555,8 @@ void wan_start(bool startup)
             procwrite("/proc/rtk_vlan_support", "1");
             procwrite("/proc/eth1/mib_vlan", "0 1 0 0 0 0 0");  // change port to LAN
 
-            sysexec(true, "brctl", "addif br0 %s", "eth1");
-            sysexec(true, "ip", "link set %s up", "eth1");
+            sysexec(true, "brctl", "addif br0 eth1");
+            sysexec(true, "ip", "link set eth1 up");
         }
 
         return;
@@ -570,7 +564,6 @@ void wan_start(bool startup)
     else
     if(IS(mode, "pppoe"))
     {
-        char *buf;
         const char *conf = "plugin rp-pppoe.so %s\n"
                            "user %s\n"
                            "password %s\n"
@@ -589,25 +582,16 @@ void wan_start(bool startup)
                            "persist\n"
                            "maxfail 0\n"
                            "ifname pppv4\n"
+                           "noipv6\n"
                            "mtu %s\n";
 
-        asprintf(&buf, conf, "eth1", v4usr, v4pwd, config_read_string("network.wan.mtu"));
-
-        write_textfile("/etc/pppd.conf", buf, false);
-
-        // dual stack IPv6
-        if(IS(v4pwd,v6pwd) && IS(v4usr, v6usr))
-            write_textfile("/etc/pppd.conf", "+ipv6 ipv6cp-use-ipaddr\n", true);
-        else
-            write_textfile("/etc/pppd.conf", "noipv6\n", true);
+        save_textfile("/etc/pppd.conf", conf, "eth1", v4usr, v4pwd, config_read_string("network.wan.mtu"));
 
         if(!is_empty(mac))
             sysexec(true, "ip", "link set eth1 address %s", mac);
 
         sysexec(true, "ip", "link set eth1 up");
         sysexec(false, "pppd", "file /etc/pppd.conf");
-
-        free(buf);
     }
     else if(IS(mode, "dhcp"))
     {
@@ -651,17 +635,17 @@ void wan_start(bool startup)
             if(!is_empty(dns1))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns1);
-                write_textfile("/etc/resolv.dnsmasq", server, false);
+                save_textfile("/etc/resolv.dnsmasq", server);
             }
             if(!is_empty(dns2))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns2);
-                write_textfile("/etc/resolv.dnsmasq", server, true);
+                concat_textfile("/etc/resolv.dnsmasq", server);
             }
             if(!is_empty(dns3))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns3);
-                write_textfile("/etc/resolv.dnsmasq", server, true);
+                concat_textfile("/etc/resolv.dnsmasq", server);
             }
         }
     }
@@ -682,11 +666,14 @@ void wan_start(bool startup)
     }
     else
         procwrite("/proc/rtk_vlan_support", "0");
+}
 
+void wanv6_start(bool startup)
+{
     // ipv6 address
     if(config_item_active("network.ipv6.active"))
     {
-        char *mode = config_read_string("network.ipv6.wan_mode");
+        char *mode = config_read_string("network.ipv6.mode");
 
         sysexec(true, "sysctl", "-w net.ipv6.conf.all.autoconf=1");
         sysexec(true, "sysctl", "-w net.ipv6.conf.all.accept_ra=0");
@@ -695,65 +682,46 @@ void wan_start(bool startup)
   
         if(IS(mode, "dhcp"))
         {
+            // get IPv6 from DHCP server
+            sysexec(true, "dhcp6c", "-c /etc/dhcp6c.conf eth1");
         }
         else
         if(IS(mode, "pppoe"))
         {
-            // dual stack IPv6
-            if(IS(v4pwd,v6pwd) && IS(v4usr, v6usr))
-            {
-            }
-            else
-            {
-                char *buf;
-                const char *conf = "plugin rp-pppoe.so %s\n"
-                                "user %s\n"
-                                "password %s\n"
-                                "usepeerdns\n"
-                                "nolog\n"
-                                "noipx\n"
-                                "novj\n"
-                                "nobsdcomp\n"
-                                "noresolv\n"
-                                "ktune\n"
-                                "noipdefault\n"
-                                "noip\n"
-                                "+ipv6 ipv6cp-use-ipaddr\n"
-                                "hide-password\n"
-                                "lcp-echo-interval 20\n"
-                                "lcp-echo-failure 3\n"
-                                "noauth\n"
-                                "persist\n"
-                                "ifname pppv6\n"
-                                "maxfail 0";
+            char *buf;
+            char *v6pwd = config_read_string("network.ipv6.pppoe_password");
+            char *v6usr = config_read_string("network.ipv6.pppoe_username");
 
-                asprintf(&buf, conf, "eth1", v6usr, v6pwd);
+            const char *conf = "plugin rp-pppoe.so %s\n"
+                            "user %s\n"
+                            "password %s\n"
+                            "usepeerdns\n"
+                            "nolog\n"
+                            "noipx\n"
+                            "novj\n"
+                            "nobsdcomp\n"
+                            "noresolv\n"
+                            "ktune\n"
+                            "noipdefault\n"
+                            "noip\n"
+                            "+ipv6 ipv6cp-use-ipaddr\n"
+                            "hide-password\n"
+                            "lcp-echo-interval 20\n"
+                            "lcp-echo-failure 3\n"
+                            "noauth\n"
+                            "persist\n"
+                            "ifname pppv6\n"
+                            "maxfail 0";
 
-                write_textfile("/etc/pppd6.conf", buf, false);
+            asprintf(&buf, conf, "eth1", v6usr, v6pwd);
 
-                sysexec(true, "ip", "link set eth1 up");
-                sysexec(false, "pppd", "file /etc/pppd6.conf");
+            save_textfile("/etc/pppd6.conf", buf);
 
-                free(buf);
-            }
+            sysexec(true, "ip", "link set eth1 up");
+            sysexec(false, "pppd", "file /etc/pppd6.conf");
+
+            free(buf);
         }
-        else
-        if(IS(mode, "static"))
-        {
-            const char *script = "ADDR1=$(ipaddr -6 show dev eth1 scope global | awk 'BEGIN {FS=\":| +\"; OFS=\":\"}{ if($2==\"inet6\") { print $3,$4,$5,$6; exit; } }')\n"
-                                 "ADDR2=$(ipaddr -6 show dev br0 scope link | awk 'BEGIN {FS=\":| +\"; OFS=\":\"}{ if($2==\"inet6\") print $5,$6,$7,$8 }')\n"
-                                 "ipaddr -6 add $ADDR1:$ADDR2 dev br0\n";
-
-            sysexec(true, "ip", "addr -f inet6 add %s/%s dev eth1", config_read_string("network.ipv6.wan_addr"),
-                                                            config_read_string("network.ipv6.wan_prefix"));
-
-            sysexec(true, "ip", "route -6 add ::/0 dev eth1");
-            sysexec(true, "ip", "route -6 add default gw %s dev eth1", config_read_string("network.ipv6.wan_gateway"));
-
-            sysexec_shell(script);
-        }
-
-        sysexec(true, "ip", "link set eth1 up");
     }
 }
 
@@ -1280,17 +1248,17 @@ void wireless_start(bool startup)
             if(IS(opmode, "repeater") || IS(sysopmode, "bridge"))
             {
                 // put all interfaces in the same bridge
-                sysexec(true, "brctl", "addif br0 %s", "wlan0-vxd");
-                sysexec(true, "brctl", "addif br0 %s", "wlan0");
-                sysexec(true, "brctl", "addif br0 %s", "wlan0-va1");
-                sysexec(true, "brctl", "addif br0 %s", "wlan0-va2");
+                sysexec(true, "brctl", "addif br0 wlan0-vxd");
+                sysexec(true, "brctl", "addif br0 wlan0");
+                sysexec(true, "brctl", "addif br0 wlan0-va1");
+                sysexec(true, "brctl", "addif br0 wlan0-va2");
             }
             else
             {
                 // add primary wireless to LAN bridge device
-                sysexec(true, "brctl", "addif br0 %s", "wlan0");
-                sysexec(true, "brctl", "addif br1 %s", "wlan0-va1");
-                sysexec(true, "brctl", "addif br2 %s", "wlan0-va2");
+                sysexec(true, "brctl", "addif br0 wlan0");
+                sysexec(true, "brctl", "addif br1 wlan0-va1");
+                sysexec(true, "brctl", "addif br2 wlan0-va2");
             }
         }
         else
@@ -1298,16 +1266,16 @@ void wireless_start(bool startup)
             // tell driver to reload config
             sysexec(true, "iwpriv", "wlan0 cfgfile");
 
-            sysexec(true, "ip", "link set %s down", "wlan0-va1");
-            sysexec(true, "ip", "link set %s down", "wlan0-va2");
-            sysexec(true, "ip", "link set %s down", "wlan0-vxd");
-            sysexec(true, "ip", "link set %s down", "wlan0");
+            sysexec(true, "ip", "link set wlan0-va1 down");
+            sysexec(true, "ip", "link set wlan0-va2 down");
+            sysexec(true, "ip", "link set wlan0-vxd down");
+            sysexec(true, "ip", "link set wlan0 down");
         }
 
         if(config_item_active("network.primary_wireless.active"))
-            sysexec(true, "ip", "link set %s up", "wlan0");
+            sysexec(true, "ip", "link set wlan0 up");
 
-        sysexec(true, "ip", "-4 addr flush dev %s", "br1");
+        sysexec(true, "ip", "-4 addr flush dev br1");
         if(config_item_active("network.secondary_wireless.active"))
         {
             // set secondary interface IP address
@@ -1315,26 +1283,26 @@ void wireless_start(bool startup)
                                                         config_read_string("network.secondary_wireless.netmask"),
                                                         "br1");
 
-            sysexec(true, "ip", "link set %s up", "wlan0-va1");
+            sysexec(true, "ip", "link set wlan0-va1 up");
         }
         else
-            sysexec(true, "ip", "link set %s down", "wlan0-va1");
+            sysexec(true, "ip", "link set wlan0-va1 down");
 
-        sysexec(true, "ip", "-4 addr flush dev %s", "br2");
+        sysexec(true, "ip", "-4 addr flush dev br2");
         if(config_item_active("network.third_wireless.active"))
         {
             // set third interface IP address
-            sysexec(true, "ip", "addr add %s/%s dev %s", config_read_string("network.third_wireless.ipaddr"),
-                                                        config_read_string("network.third_wireless.netmask"),
-                                                        "br2");
+            sysexec(true, "ip", "-4 addr add %s/%s dev %s", config_read_string("network.third_wireless.ipaddr"),
+                                                            config_read_string("network.third_wireless.netmask"),
+                                                            "br2");
 
-            sysexec(true, "ip", "link set %s up", "wlan0-va2");
+            sysexec(true, "ip", "link set wlan0-va2 up");
         }
         else
-            sysexec(true, "ip", "link set %s down", "wlan0-va2");
+            sysexec(true, "ip", "link set wlan0-va2 down");
 
         if(IS(opmode, "repeater"))
-            sysexec(true, "ip", "link set %s up", "wlan0-vxd");
+            sysexec(true, "ip", "link set wlan0-vxd up");
 
 
         procwrite("/proc/wlan0/led", "3");
@@ -1691,6 +1659,45 @@ void openvpn_start(bool startup)
                 free(buf);
             }
         }
+
+        // add iptables rules to inbound traffic
+        sysexec(true, "iptables", "-t filter -A services-inbound -i eth1 -m connlimit ! --connlimit-above 2 --connlimit-mask 32 -p udp --dport %s -j ACCEPT", listen_port);
+
+        char *cfg = "daemon\n"
+                    "dev tun\n"
+                    "proto udp4\n"
+                    "ifconfig %s %s\n"
+                    "secret /etc/static.key\n"
+                    "keepalive 10 60\n"
+                    "ping-timer-rem\n"
+                    "persist-tun\n"
+                    "persist-key\n";
+
+        save_textfile("/etc/vpn.conf", cfg, config_read_string("vpn.server_address"),
+                                              config_read_string("vpn.client_address"));
+
+        cJSON *next = config_get_node("vpn.routes");
+        if(next->type == cJSON_Array)
+        {
+            for(int y=0; y<cJSON_GetArraySize(next); y++)
+            {
+                cJSON *array = cJSON_GetArrayItem(next, y);
+
+                char *addr = cJSON_GetObjectItem(array, "address")->valuestring;
+                char *mask = cJSON_GetObjectItem(array, "network")->valuestring;
+
+                concat_textfile("/etc/vpn.conf", "route %s %s\n", addr, mask);
+            }
+        }
+
+        // only client mode need an extra argument
+        if(IS(mode, "client"))
+        {
+
+        }
+
+        // openvpn crashes if net tools are being used by another daemon
+        sysexec_shell("sleep 10 && openvpn /etc/vpn.conf >/dev/null 2>&1 &");
     }
 }
 
@@ -1878,6 +1885,7 @@ void sysinit_main(int argc, char **argv)
     portforward_start();    DEBUG("portforward done");
     lan_start(true);        DEBUG("lan done");
     wan_start(true);        DEBUG("wan done");
+    wanv6_start(true);      DEBUG("wanv6 done");
     wireless_start(true);   DEBUG("wireless done");
     dnsmasq_start(true);    DEBUG("dnsmasq done");
     cron_start(true);       DEBUG("cron done");
@@ -1886,6 +1894,7 @@ void sysinit_main(int argc, char **argv)
     webserver_start(true);  DEBUG("webserver done");
     miniupnpd_start();      DEBUG("miniupnpd done");
     dropbear_start();       DEBUG("dropbear done");
+    openvpn_start(true);    DEBUG("openvpn done");
 
     DEBUG("end services");
 

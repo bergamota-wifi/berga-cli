@@ -21,20 +21,36 @@
  * SOFTWARE.
  */
 
-#ifndef MAIN_H
-#define	MAIN_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#include "utils.h"
 
-void sysinit_main(int argc, char **argv);
-void pppd_script_command(int argc, char **argv);
-void dhcp6c_lease_command(char *cmd);
-void udhcpc_lease_command(char *cmd);
+////////////////////////////////////
+//
+//  IPv6 related only code!
+//
+////////////////////////////////////
 
-#ifdef	__cplusplus
+void dhcp6c_lease_command(char *cmd)
+{
+    char *reason = getenv("REASON");
+    char *dns = getenv("new_domain_name_servers");
+
+    if(IS(reason, "NBI"))
+    {
+        char *token;
+        char server[256];
+
+        // dns servers from dhcp environment
+        while((token = strsep(&dns," ")))
+        {
+            snprintf(server, sizeof(server), "nameserver %s\n", token);
+            concat_textfile("/etc/resolv.dnsmasq", server);
+        }
+    }
 }
-#endif
-
-#endif	/* MAIN_H */

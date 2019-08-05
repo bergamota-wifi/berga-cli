@@ -74,6 +74,14 @@ int main(int argc, char **argv)
                 udhcpc_lease_command(argv[1]);
                 return EXIT_SUCCESS;
             }
+            // dhcpv6 lease
+            else if(IS(fname, "dhcp6c-script"))
+            {
+                DEBUG("dhcp6c script mode called");
+
+                dhcp6c_lease_command(argv[1]);
+                return EXIT_SUCCESS;
+            }
             //////////////////////////////////////////
             if(argc>=2)
             {

@@ -60,8 +60,8 @@ void pppd_script_command(int argc, char **argv)
     else
     if(IS(cmd, "ipv6-down"))
     {
-        if(config_item_active("network.ipv6.active"))
-            syskill("dhclient");
+        //if(config_item_active("network.ipv6.active"))
+        //    syskill("dhclient");
     }
     else
     if(IS(cmd, "ipv6-up"))
@@ -69,7 +69,7 @@ void pppd_script_command(int argc, char **argv)
         if(config_item_active("network.ipv6.active"))
         {
             // grab IPv6 PD
-            sysexec_shell("sleep 10 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw %s >/dev/null 2>&1 &", iface);
+            //sysexec_shell("sleep 10 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw %s >/dev/null 2>&1 &", iface);
         }
     }
     else
@@ -78,7 +78,6 @@ void pppd_script_command(int argc, char **argv)
         char *dns1 = getenv("DNS1");
         char *dns2 = getenv("DNS2");
         char *dns3 = NULL;
-        char server[256];
 
         unlink("/etc/resolv.dnsmasq");
 
@@ -90,26 +89,17 @@ void pppd_script_command(int argc, char **argv)
         }
 
         if(!is_empty(dns1))
-        {
-            snprintf(server, sizeof(server), "nameserver %s\n", dns1);
-            write_textfile("/etc/resolv.dnsmasq", server, false);
-        }
+            save_textfile("/etc/resolv.dnsmasq", "nameserver %s\n", dns1);
         if(!is_empty(dns2))
-        {
-            snprintf(server, sizeof(server), "nameserver %s\n", dns2);
-            write_textfile("/etc/resolv.dnsmasq", server, true);
-        }
+            concat_textfile("/etc/resolv.dnsmasq", "nameserver %s\n", dns2);
         if(!is_empty(dns3))
-        {
-            snprintf(server, sizeof(server), "nameserver %s\n", dns3);
-            write_textfile("/etc/resolv.dnsmasq", server, true);
-        }
+            concat_textfile("/etc/resolv.dnsmasq", "nameserver %s\n", dns3);
 
         // ipv6 address
         if(config_item_active("network.ipv6.active"))
         {
             // dual stack grab IPv6 PD
-            sysexec_shell("sleep 10 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw %s >/dev/null 2>&1 &", iface);
+            //sysexec_shell("sleep 10 && dhclient -6 -P -sf /usr/bin/ipv6_pppoe.sh -nw %s >/dev/null 2>&1 &", iface);
         }
 
         sleep(5);
@@ -160,6 +150,8 @@ void pppd_script_command(int argc, char **argv)
         sysexec_shell("route add default gw %s dev %s", gateway, iface);
         //sysexec_shell("ip route replace default table main via %s dev %s", gateway, iface);
 #endif
+        // fork a ddns update process
+        sysexec_shell("sleep 10 && berga-cli ddnsupdate >/dev/null 2>&1 &");
     }
 
     config_close();

@@ -30,6 +30,12 @@
 
 #include "utils.h"
 
+////////////////////////////////////
+//
+//  IPv4 related only code!
+//
+////////////////////////////////////
+
 void udhcpc_lease_command(char *cmd)
 {
     char *iface = getenv("interface");
@@ -68,17 +74,17 @@ void udhcpc_lease_command(char *cmd)
             if(!is_empty(dns1))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns1);
-                write_textfile("/etc/resolv.dnsmasq", server, false);
+                save_textfile("/etc/resolv.dnsmasq", server);
             }
             if(!is_empty(dns2))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns2);
-                write_textfile("/etc/resolv.dnsmasq", server, true);
+                concat_textfile("/etc/resolv.dnsmasq", server);
             }
             if(!is_empty(dns3))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", dns3);
-                write_textfile("/etc/resolv.dnsmasq", server, true);
+                concat_textfile("/etc/resolv.dnsmasq", server);
             }
         }
         else
@@ -87,7 +93,7 @@ void udhcpc_lease_command(char *cmd)
             while((token = strsep(&dns," ")))
             {
                 snprintf(server, sizeof(server), "nameserver %s\n", token);
-                write_textfile("/etc/resolv.dnsmasq", server, true);
+                concat_textfile("/etc/resolv.dnsmasq", server);
             }
         }
 
@@ -142,6 +148,9 @@ void udhcpc_lease_command(char *cmd)
         sysexec(true, "route", "del default");
         sysexec(true, "route", "add default gw %s dev %s", router, iface);
 #endif
+
+        // fork a ddns update process
+        sysexec_shell("sleep 10 && berga-cli ddnsupdate >/dev/null 2>&1 &");
     }
     
     config_close();

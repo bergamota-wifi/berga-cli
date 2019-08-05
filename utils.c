@@ -714,7 +714,6 @@ void config_adapt()
         { cJSON_Object, &json_root, &sub1, "network", NULL },
             { cJSON_Object, &sub1, &sub2, "wireless", NULL },
             { cJSON_String, &sub2, NULL, "active", "true" },
-            { cJSON_String, &sub2, NULL, "hidden", "false" },
             { cJSON_String, &sub2, NULL, "opmode", "master" },
             { cJSON_String, &sub2, NULL, "band", "bgn" },
             { cJSON_String, &sub2, NULL, "channel", "1" },
@@ -816,20 +815,9 @@ void config_adapt()
 
             { cJSON_Object, &sub1, &sub2, "ipv6", NULL },
             { cJSON_String, &sub2, NULL, "active", "false" },
-            { cJSON_String, &sub2, NULL, "wan_mode", "dhcp" },
-            { cJSON_String, &sub2, NULL, "lan_mode", "radv" },
-            { cJSON_String, &sub2, NULL, "wan_prefix", "64" },
-            { cJSON_String, &sub2, NULL, "wan_addr", "" },
-            { cJSON_String, &sub2, NULL, "wan_gateway", "" },
-            { cJSON_String, &sub2, NULL, "wan_mtu", "1500" },
-            { cJSON_String, &sub2, NULL, "lan_prefix", "64" },
-            { cJSON_String, &sub2, NULL, "lan_addr", "" },
-            { cJSON_String, &sub2, NULL, "dhcp_start", "1000" },
-            { cJSON_String, &sub2, NULL, "dhcp_end", "2000" },
+            { cJSON_String, &sub2, NULL, "mode", "dhcp" },
             { cJSON_String, &sub2, NULL, "pppoe_username", "" },
             { cJSON_String, &sub2, NULL, "pppoe_password", "" },
-            { cJSON_String, &sub2, NULL, "dhcp_lease", "1" },
-            { cJSON_String, &sub2, NULL, "dnsactive", "false" },
             { cJSON_String, &sub2, NULL, "dns1", "" },
             { cJSON_String, &sub2, NULL, "dns2", "" },
             { cJSON_String, &sub2, NULL, "dns3", "" },
@@ -840,16 +828,18 @@ void config_adapt()
             { cJSON_String, &sub1, NULL, "username", "" },
             { cJSON_String, &sub1, NULL, "password", "" },
             { cJSON_String, &sub1, NULL, "domain", "" },
+            { cJSON_String, &sub1, NULL, "token", "" },
 
         { cJSON_Object, &json_root, &sub1, "vpn", NULL },
             { cJSON_String, &sub1, NULL, "active", "false" },
-            { cJSON_String, &sub1, NULL, "mode", "" },  // server,client
-            { cJSON_String, &sub1, NULL, "client_address", "" },
-            { cJSON_String, &sub1, NULL, "server_address", "" },
+            { cJSON_String, &sub1, NULL, "mode", "server" },  // server,client
+            { cJSON_String, &sub1, NULL, "client_address", "10.8.0.2" },
+            { cJSON_String, &sub1, NULL, "server_address", "10.8.0.1" },
             { cJSON_String, &sub1, NULL, "connect_address", "" },
             { cJSON_String, &sub1, NULL, "connect_port", "" },
             { cJSON_String, &sub1, NULL, "listen_port", "1194" },
             { cJSON_String, &sub1, NULL, "statickey", "" },
+            { cJSON_Array, &sub2, &sub3, "routes", NULL },
 
         { cJSON_Object, &json_root, &sub1, "remoteshell", NULL },
             { cJSON_String, &sub1, NULL, "active", "true" },
@@ -1014,38 +1004,8 @@ void print_log(char *fmt, ...)
     fclose(f);
 }
 
-bool save_configfile(const char *name, const char *fmt, ...)
-{
-    char *buf;
-
-    va_list argp;
-    va_start(argp, fmt);
-    vasprintf(&buf, fmt, argp);
-
-    write_textfile(name, buf, false);
-
-    free(buf);
-
-    return true;
-}
-
-bool concat_configfile(const char *name, const char *fmt, ...)
-{
-    char *buf;
-
-    va_list argp;
-    va_start(argp, fmt);
-    vasprintf(&buf, fmt, argp);
-
-    write_textfile(name, buf, true);
-
-    free(buf);
-
-    return true;
-}
-
 // save a text file, used for configuration files
-bool write_textfile(const char *name, const char *txt, bool concat)
+static bool write_textfile(const char *name, const char *txt, bool concat)
 {
     FILE *f;
 
@@ -1061,6 +1021,36 @@ bool write_textfile(const char *name, const char *txt, bool concat)
     fclose(f);
 
     chmod(name, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+
+    return true;
+}
+
+bool save_textfile(const char *name, const char *fmt, ...)
+{
+    char *buf;
+
+    va_list argp;
+    va_start(argp, fmt);
+    vasprintf(&buf, fmt, argp);
+
+    write_textfile(name, buf, false);
+
+    free(buf);
+
+    return true;
+}
+
+bool concat_textfile(const char *name, const char *fmt, ...)
+{
+    char *buf;
+
+    va_list argp;
+    va_start(argp, fmt);
+    vasprintf(&buf, fmt, argp);
+
+    write_textfile(name, buf, true);
+
+    free(buf);
 
     return true;
 }
